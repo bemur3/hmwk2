@@ -26,12 +26,12 @@ final.hcris=rbind(final.hcris.v1996,final.hcris.v2010) %>%
 final.hcris %>% group_by(fyear) %>% count()
 
 
-
+#make a loop looking for duplicates in a given year 
 # Clean data --------------------------------------------------------------
 
 ## create count of reports by hospital fiscal year
 final.hcris =
-  final.hcris %>% 
+  final.hcris %>% filter(fyear %in% c(1998,1999,2000,2001)) %>%
   add_count(provider_number, fyear, name="total_reports")
 
 ## create running total of reports
