@@ -1,6 +1,6 @@
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, ggplot2, dplyr, lubridate)
-gc()
+
 
 # Read and combine data ---------------------------------------------------
 source('submission1/data-code/H1_HCRISv1996.R')
@@ -31,7 +31,7 @@ final.hcris %>% group_by(fyear) %>% count()
 
 ## create count of reports by hospital fiscal year
 final.hcris =
-  final.hcris %>% filter(fyear %in% c(2008,2009,2010,2011,2012,2013,2014,2015)) %>%
+  final.hcris %>% filter(fyear %in% c(2009,2010,2011,2012)) %>%
   add_count(provider_number, fyear, name="total_reports")
 
 ## create running total of reports
