@@ -22,11 +22,16 @@ pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, readr, readxl, hrbrthemes, 
                kableExtra)
 ```
 
+```{r}
+#| include: false
+#| eval: true
+getwd()
+load("/Users/ethanmurakami/Documents/GitHub/hmwk2/submission1/Hwk2_workspace.Rdata")
+```
 
 
 
-
-Here is a hyperlink to my repository [Repository](https://github.com/bemur3/Homework-1)
+Here is a hyperlink to my repository [Repository](https://github.com/bemur3/hmwk2)
 
 My answers to the homework questions are described below. 
 
@@ -58,3 +63,28 @@ ggplot(multi_report_counts, aes(x = fyear, y = num_hospitals)) +
 
 ```
 \newpage
+
+Question 2
+```{r} 
+
+unique_hospital_count <- final.hcris.data %>%
+  distinct(provider_number) %>%
+  nrow()
+
+cat("Number of unique hospital IDs (Medicare provider numbers):", unique_hospital_count, "\n")
+```
+\newpage
+
+Question 3
+```{r} 
+ggplot(final.hcris.data, aes(x = factor(year), y = tot_charges)) +
+  geom_violin(fill = "lightblue", color = "darkblue", alpha = 0.6) +
+  scale_y_log10() + # Apply log scale to handle skewed distributions
+  labs(
+    title = "Distribution of Total Charges by Year",
+    x = "Year",
+    y = "Total Charges (log scale)",
+    caption = "Source: HCRIS Data (1996 & 2010 Versions)"
+  ) +
+  theme_classic()
+  ```

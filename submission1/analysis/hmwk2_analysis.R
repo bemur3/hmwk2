@@ -6,7 +6,6 @@ multi_report_counts <- duplicate.hcris %>%
 group_by(fyear) %>%
 summarise(num_hospitals = n_distinct(provider_number))
 
-# Plot the number of hospitals filing multiple reports by year
 ggplot(multi_report_counts, aes(x = fyear, y = num_hospitals)) +
 geom_line(color = "blue", size = 1) +
 geom_point(color = "red", size = 2) +
@@ -24,7 +23,6 @@ unique_hospital_count <- final.hcris.data %>%
 distinct(provider_number) %>%
 nrow()
 
-# Print the result
 cat("Number of unique hospital IDs (Medicare provider numbers):", unique_hospital_count, "\n")
 
 # QUESTION 3: 
@@ -60,3 +58,5 @@ ggplot(final.hcris.data_clean, aes(x = as.factor(year), y = price)) +
   ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+save.image("submission1/Hwk2_workspace.RData")
