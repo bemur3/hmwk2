@@ -1,0 +1,60 @@
+---
+title: "Homework 2"
+subtitle: "Research Methods, Spring 2025"
+author: "Ethan Murakami"
+format:
+  pdf:
+    output-file: "murakami-e-hwk2-1"
+    output-ext:  "pdf"
+    header-includes:
+      - \usepackage{float}
+      - \floatplacement{table}{H}
+---
+
+```{r}
+#| include: false
+
+
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, readr, readxl, hrbrthemes, fixest,
+               scales, gganimate, gapminder, gifski, png, tufte, plotly, OECD,
+               ggrepel, survey, foreign, devtools, pdftools, kableExtra, modelsummary,
+               kableExtra)
+```
+
+
+
+
+
+Here is a hyperlink to my repository [Repository](https://github.com/bemur3/Homework-1)
+
+My answers to the homework questions are described below. 
+
+
+\newpage
+# Building the Data
+Answer the following based on our initial, simplified dataset of enrollments, plan types, and service areas:
+
+\noindent 1. Provide a table of the count of hospitals with multiple reports filed in one year
+
+```{r} 
+#| echo: false
+#| label: tbl-plans
+#| tbl-cap: Multiple reports
+
+multi_report_counts <- duplicate.hcris %>%
+  group_by(fyear) %>%
+  summarise(num_hospitals = n_distinct(provider_number))
+ggplot(multi_report_counts, aes(x = fyear, y = num_hospitals)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "red", size = 2) +
+  labs(
+    title = "Hospitals Filing Multiple Reports Per Year",
+    x = "Year",
+    y = "Number of Hospitals",
+    caption = "Source: HCRIS Data (1996 & 2010 Versions)"
+  ) +
+  theme_classic()
+
+```
+\newpage
