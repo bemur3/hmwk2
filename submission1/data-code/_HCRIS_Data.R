@@ -1,6 +1,6 @@
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, ggplot2, dplyr, lubridate)
-
+gc()
 
 # Read and combine data ---------------------------------------------------
 source('submission1/data-code/H1_HCRISv1996.R')
@@ -80,6 +80,7 @@ unique.hcris2 =
             street=first(street), city=first(city), state=first(state),
             zip=first(zip), county=first(county)) %>%
   mutate(source='total for year')
+
 
 ## identify hospitals with more than one report and with elapsed time exceeding 370 days
 duplicate.hcris2 =
