@@ -21,7 +21,7 @@ hcris.vars = rbind(hcris.vars,c('zip','S200000','00101','0300','alpha'))
 hcris.vars = rbind(hcris.vars,c('county','S200000','00101','0400','alpha'))
 colnames(hcris.vars)=c("variable","WKSHT_CD","LINE_NUM","CLMN_NUM","source")
 
-for (i in 2008:2011) {
+for (i in 2009:2011) {
   HCRIS.alpha=read_csv(paste0("data/input/HCRIS_v1996/HospitalFY",i,"/hosp_",i,"_ALPHA.CSV"),
                        col_names=c('RPT_REC_NUM','WKSHT_CD','LINE_NUM','CLMN_NUM','ITM_VAL_NUM'))
   HCRIS.numeric=read_csv(paste0("data/input/HCRIS_v1996/HospitalFY",i,"/hosp_",i,"_NMRC.CSV"),
@@ -50,8 +50,8 @@ for (i in 2008:2011) {
               by="report")
   }
   assign(paste("final.reports.",i,sep=""),final.reports)
-  if (i==2008) {
-    final.hcris.v1996=final.reports.2008
+  if (i==2009) {
+    final.hcris.v1996=final.reports.2000
   } else {
     final.hcris.v1996=rbind(final.hcris.v1996,get(paste("final.reports.",i,sep="")))
   }
