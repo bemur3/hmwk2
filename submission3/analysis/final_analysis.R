@@ -31,8 +31,23 @@ nrow()
 cat("Number of unique hospital IDs (Medicare provider numbers):", unique_hospital_count, "\n")
 
 # QUESTION 3: 
+charge.data <- final.hcris.data %>%
+  group_by(year) %>%
+  mutate(
+    tot_charges_low = quantile(tot_charges, probs = 0.01, na.rm = TRUE),
+    tot_charges_high = quantile(tot_charges, probs = 0.99, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%  # Ungroup to avoid issues with mutate()
+  filter(
+    tot_charges > tot_charges_low,
+    tot_charges < tot_charges_high,
+    !is.na(tot_charges),
+    year > 1997
+  ) %>%
+  mutate(log_charge = log(tot_charges))
 
-ggplot(final.hcris.data, aes(x = factor(year), y = tot_charges)) +
+
+ggplot(charge.data, aes(x = factor(year), y = tot_charges)) +
 geom_violin(fill = "lightblue", color = "darkblue", alpha = 0.6) +
 scale_y_log10() + 
 labs(
