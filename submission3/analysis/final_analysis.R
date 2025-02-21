@@ -21,21 +21,25 @@ theme_classic()
 # QUESTION 2:
 # Count the number of unique hospital IDs
 
-fig.unique <- hcris.data %>% group_by(year) %>%
-
-
-unique_hospital_count <- final.hcris.data %>%
-distinct(provider_number) %>%
-nrow()
-
-cat("Number of unique hospital IDs (Medicare provider numbers):", unique_hospital_count, "\n")
+fig.unique <- final.hcris.data %>% group_by(year) %>%
+  summarize(unique_hospital_count=n()) %>%
+  ggplot(aes(x=as.factor(year), y=unique_hospital_count, group=1)) +
+  geom_line() +
+  labs(
+    x="Year",
+    y="Number of Hospitals",
+    title=""
+  ) + theme_bw() +
+  scale_y_continuous(labels=scales::comma,limits=c(0,6500)) +
+  theme(axis.text.x = element_text(angle=70, hjust=1))
+print(fig.unique)
 
 # QUESTION 3: 
 final.hcris.data <- final.hcris.data %>%
   group_by(year) %>%
   mutate(
-    tot_charges_low = quantile(tot_charges, probs = 0.01, na.rm = TRUE),
-    tot_charges_high = quantile(tot_charges, probs = 0.99, na.rm = TRUE)
+    tot_charges_low = quantile(tot_charges, probs = 0.05, na.rm = TRUE),
+    tot_charges_high = quantile(tot_charges, probs = 0.95, na.rm = TRUE)
   ) %>%
   ungroup() %>%  # Ungroup to avoid issues with mutate()
   filter(
@@ -59,7 +63,6 @@ caption = "Source: HCRIS Data (1996 & 2010 Versions)"
 theme_classic()
 
 # Qustion 4:
-## Step 1: Calculate discount factor
 final.hcris.data <- final.hcris.data %>%
   mutate(
     discount_factor = 1 - tot_discounts / tot_charges,
@@ -162,16 +165,92 @@ print(quartile_summary)
 
 
 
-# 7)Find the average treatment effect using each of the following estimators: 
-# Load necessary libraries
-if (!require("MatchIt")) install.packages("MatchIt")
-library(MatchIt)
+# 7) Find the average treatment effect using each of the following estimators, and present your results in a single table:
+# Load required packages
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(Matching, cobalt, dplyr)
+final.hcris.2012 <- final.hcris.2012 %>%
+  mutate(penalty = as.numeric(penalty))
 
-match.inv <- Matching::Match(Y=)
+## Nearest neighbor matching with inverse vairance distance based on quartiles of bed size
 
-# Print results
-print(results)
+near.match <- Matching::Match(Y=final.hcris.2012$price,
+                            Tr=final.hcris.2012$penalty,
+                            X=(final.hcris.2012 %>% dplyr::select(Q1, Q2, Q3)),
+                            M=1, 
+                            Weight=1,
+                            estimand="ATE",
+                            ties=FALSE)
+summary(near.match)
 
-  
+## Nearest Neighbor Matching (Mahalanobis)
+mal.match <- Matching::Match(Y=final.hcris.2012$price,
+                            Tr=final.hcris.2012$penalty,
+                            X=(final.hcris.2012 %>% dplyr::select(Q1, Q2, Q3)),
+                            M=1, 
+                            Weight=2,
+                            estimand="ATE",
+                            ties=FALSE)
+summary(mal.match)
 
-save.image("submission2/Hwk2_workspace2.RData")
+### Calculate inverse propensity weights (IPW)
+
+final.hcris.2012 <- final.hcris.2012 %>%
+  mutate(ipw = case_when(
+    penalty == 1 ~ 1 / ps,         # For treated group (penalty == 1)
+    penalty == 0 ~ 1 / (1 - ps),   # For control group (penalty == 0)
+    TRUE ~ NA_real_               # Handle any missing values
+  ))
+
+### Compute weighted average prices for treated (penalty == 1) and control (penalty == 0) groups
+mean.t1 <- final.hcris.2012 %>% filter(penalty == 1) %>%
+  dplyr::select(price, ipw) %>%
+  summarize(mean_p = weighted.mean(price, w = ipw))
+
+mean.t0 <- final.hcris.2012 %>% filter(penalty == 0) %>%
+  dplyr::select(price, ipw) %>%
+  summarize(mean_p = weighted.mean(price, w = ipw))
+
+ipw.diff <- mean.t1$mean_p - mean.t0$mean_p
+ipw.diff
+
+## Simple Linear Regression
+reg.data <- final.hcris.2012 %>% ungroup() %>%
+  mutate(Q1_diff = penalty * (Q1 - mean(Q1)),
+         Q2_diff = penalty * (Q2 - mean(Q2)),
+         Q3_diff = penalty * (Q3 - mean(Q3)))
+
+### Fit the regression model with quartile differences and penalty
+reg <- lm(price ~ penalty + Q1 + Q2 + Q3 + 
+            Q1_diff + Q2_diff + Q3_diff,
+          data = reg.data)
+summary(reg)
+
+ate <- coef(reg)["penalty"]
+ate
+
+# Extract ATE estimates
+ate_near_match <- near.match$est
+ate_mal_match <- mal.match$est
+ate_ipw_diff <- ipw.diff
+ate_regression <- ate
+
+# Create a data frame summarizing the results
+ate_estimates <- data.frame(
+  Method = c(
+    "Nearest Matching (Inverse Variance)",
+    "Nearest Matching (Mahalanobis Distance)",
+    "Inverse Propensity Weighting (IPW)",
+    "Linear Regression"
+  ),
+  ATE_Estimate = c(ate_near_match, ate_mal_match, ate_ipw_diff, ate_regression)
+)
+
+# Print the table using knitr::kable()
+knitr::kable(ate_estimates, 
+             caption = "ATE Estimates from Different Methods", 
+             col.names = c("Method", "ATE Estimate"))
+
+
+
+save.image("submission3/Hwk2_workspace3.RData")
