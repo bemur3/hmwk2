@@ -166,90 +166,75 @@ print(quartile_summary)
 
 
 # 7) Find the average treatment effect using each of the following estimators, and present your results in a single table:
-# Load required packages
-if (!require("pacman")) install.packages("pacman")
-pacman::p_load(Matching, cobalt, dplyr)
+# Load necessary libraries
+library(Matching)
+library(cobalt)
+library(dplyr)
+
+# Ensure 'penalty' is a numeric variable
 final.hcris.2012 <- final.hcris.2012 %>%
-  mutate(penalty = as.numeric(penalty))
+  mutate(penalty = as.numeric(penalty == TRUE))
 
-## Nearest neighbor matching with inverse vairance distance based on quartiles of bed size
+# Nearest neighbor matching with inverse variance distance based on quartiles of bed size
+near_match <- Matching::Match(
+  Y = final.hcris.2012$price,
+  Tr = final.hcris.2012$penalty,
+  X = final.hcris.2012 %>% dplyr::select(Q1, Q2, Q3),  # Assuming Q1, Q2, Q3 are correctly defined in your data
+  M = 1, 
+  Weight = 1,
+  estimand = "ATE"
+)
+summary(near_match)
 
-near.match <- Matching::Match(Y=final.hcris.2012$price,
-                            Tr=final.hcris.2012$penalty,
-                            X=(final.hcris.2012 %>% dplyr::select(Q1, Q2, Q3)),
-                            M=1, 
-                            Weight=1,
-                            estimand="ATE",
-                            ties=FALSE)
-summary(near.match)
+# Nearest neighbor matching with Mahalanobis distance
+mahalanobis_match <- Matching::Match(
+  Y = final.hcris.2012$price,
+  Tr = final.hcris.2012$penalty,
+  X = final.hcris.2012 %>% dplyr::select(Q1, Q2, Q3),
+  M = 1,
+  Weight = 2,
+  estimand = "ATE"
+)
+summary(mahalanobis_match)
 
-## Nearest Neighbor Matching (Mahalanobis)
-mal.match <- Matching::Match(Y=final.hcris.2012$price,
-                            Tr=final.hcris.2012$penalty,
-                            X=(final.hcris.2012 %>% dplyr::select(Q1, Q2, Q3)),
-                            M=1, 
-                            Weight=2,
-                            estimand="ATE",
-                            ties=FALSE)
-summary(mal.match)
+# Inverse propensity weighting
+logit_model <- glm(penalty ~ Q1 + Q2 + Q3, family = binomial, data = final.hcris.2012)
+ps <- predict(logit_model, type = "response")
 
-### Calculate inverse propensity weights (IPW)
-
+# Calculate inverse propensity weights (IPW)
 final.hcris.2012 <- final.hcris.2012 %>%
-  mutate(ipw = case_when(
-    penalty == 1 ~ 1 / ps,         # For treated group (penalty == 1)
-    penalty == 0 ~ 1 / (1 - ps),   # For control group (penalty == 0)
-    TRUE ~ NA_real_               # Handle any missing values
-  ))
+  mutate(ipw = if_else(penalty == 1, 1 / ps, 1 / (1 - ps)))
 
-### Compute weighted average prices for treated (penalty == 1) and control (penalty == 0) groups
-mean.t1 <- final.hcris.2012 %>% filter(penalty == 1) %>%
-  dplyr::select(price, ipw) %>%
-  summarize(mean_p = weighted.mean(price, w = ipw))
+# Compute weighted average prices for treated (penalty == 1) and control (penalty == 0) groups
+weighted_price_penalized <- final.hcris.2012 %>%
+  filter(penalty == 1) %>%
+  summarise(weighted_price = weighted.mean(price, w = ipw))
+weighted_price_non_penalized <- final.hcris.2012 %>%
+  filter(penalty == 0) %>%
+  summarise(weighted_price = weighted.mean(price, w = ipw))
 
-mean.t0 <- final.hcris.2012 %>% filter(penalty == 0) %>%
-  dplyr::select(price, ipw) %>%
-  summarize(mean_p = weighted.mean(price, w = ipw))
+# Calculate the difference in weighted prices between penalized and non-penalized groups
+ipw_difference <- weighted_price_penalized$weighted_price - weighted_price_non_penalized$weighted_price
 
-ipw.diff <- mean.t1$mean_p - mean.t0$mean_p
-ipw.diff
+# Simple linear regression adjusting for quartiles
+reg_data <- final.hcris.2012 %>%
+  mutate_at(vars(Q1, Q2, Q3), ~ penalty * (. - mean(.)))
 
-## Simple Linear Regression
-reg.data <- final.hcris.2012 %>% ungroup() %>%
-  mutate(Q1_diff = penalty * (Q1 - mean(Q1)),
-         Q2_diff = penalty * (Q2 - mean(Q2)),
-         Q3_diff = penalty * (Q3 - mean(Q3)))
+reg_model <- lm(price ~ penalty + Q1 + Q2 + Q3 + Q1:penalty + Q2:penalty + Q3:penalty, data = reg_data)
+summary(reg_model)
 
-### Fit the regression model with quartile differences and penalty
-reg <- lm(price ~ penalty + Q1 + Q2 + Q3 + 
-            Q1_diff + Q2_diff + Q3_diff,
-          data = reg.data)
-summary(reg)
+ate_linear_regression <- coef(reg_model)["penalty"]
 
-ate <- coef(reg)["penalty"]
-ate
-
-# Extract ATE estimates
-ate_near_match <- near.match$est
-ate_mal_match <- mal.match$est
-ate_ipw_diff <- ipw.diff
-ate_regression <- ate
-
-# Create a data frame summarizing the results
+# Compile ATE estimates from different methods into a single table
 ate_estimates <- data.frame(
-  Method = c(
-    "Nearest Matching (Inverse Variance)",
-    "Nearest Matching (Mahalanobis Distance)",
-    "Inverse Propensity Weighting (IPW)",
-    "Linear Regression"
-  ),
-  ATE_Estimate = c(ate_near_match, ate_mal_match, ate_ipw_diff, ate_regression)
+  Method = c("Nearest Matching (Inverse Variance)", "Nearest Matching (Mahalanobis Distance)", "Inverse Propensity Weighting", "Linear Regression"),
+  ATE_Estimate = c(summary(near_match)$estimate, summary(mahalanobis_match)$estimate, ipw_difference, ate_linear_regression)
 )
 
-# Print the table using knitr::kable()
-knitr::kable(ate_estimates, 
-             caption = "ATE Estimates from Different Methods", 
-             col.names = c("Method", "ATE Estimate"))
+# Print the table using kable
+knitr::kable(ate_estimates, caption = "ATE Estimates from Different Methods", col.names = c("Method", "ATE Estimate"))
+
+
 
 
 
